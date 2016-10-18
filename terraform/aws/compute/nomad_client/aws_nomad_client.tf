@@ -29,7 +29,7 @@ module "nomad_client_template" {
 }
 
 resource "template_file" "nomad_client" {
-  template = "${module.nomad_client_template.user_data}"
+  template = "${module.nomad_client_template.script}"
   count    = "${var.node_classes}"
 
   vars {

@@ -1,1 +1,1 @@
-output "user_data" { value = "${path.module}/nomad_client.sh.tpl" }
+output "script" { value = "${path.module}/nomad_client.sh.tpl" }

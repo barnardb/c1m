@@ -1,21 +1,16 @@
 job "redis" {
   region      = "${region}"
-  datacenters = ["${datacenter}"]
+  datacenters = [${datacenters}]
   type        = "service"
-  priority    = 50
+  priority    = ${priority}
 
   update {
-    stagger      = "10s"
+    stagger      = "1s"
     max_parallel = 1
   }
 
   group "redis" {
     count = ${count}
-
-    constraint {
-      attribute = "\$${node.datacenter}"
-      value     = "${datacenter}"
-    }
 
     restart {
       mode     = "delay"
@@ -31,7 +26,7 @@ job "redis" {
         image = "${image}"
 
         port_map {
-          db = 6379
+          redis = 6379
         }
       }
 
@@ -43,7 +38,7 @@ job "redis" {
         network {
           mbits = 1
 
-          port "db" {
+          port "redis" {
             static = 6379
           }
         }
@@ -56,8 +51,8 @@ job "redis" {
 
       service {
         name = "redis"
-        tags = ["global", "${region}"]
-        port = "db"
+        port = "redis"
+        tags = [${tags}]
 
         check {
           name     = "redis alive"

@@ -3,14 +3,15 @@ set -e
 
 logger() {
   DT=$(date '+%Y/%m/%d %H:%M:%S')
-  echo "$DT pq.sh: $1"
-  echo "$DT pq.sh: $1" | sudo tee -a /var/log/user_data.log > /dev/null
+  echo "$DT pq_catch_all.sh: $1" | sudo tee -a /var/log/user_data.log > /dev/null
 }
 
 logger "Begin script"
 
+CONSUL_ADDR=http://127.0.0.1:8500
+
 servers() {
-  PASSING=$(curl -s "http://127.0.0.1:8500/v1/health/service/${consul_join_name}")
+  PASSING=$(curl -s "$CONSUL_ADDR/v1/health/service/${consul_join_name}")
 
   # Check if valid json is returned, otherwise jq command fails
   if [[ "$PASSING" == [{* ]]; then
@@ -18,7 +19,7 @@ servers() {
   fi
 }
 
-sleep 15 # Wait for Consul service to fully boot
+logger "Getting Consul servers"
 CONSUL_SERVERS=$(servers)
 logger "Initial Consul servers: $CONSUL_SERVERS"
 CONSUL_SERVER_LEN=$(echo $CONSUL_SERVERS | wc -w)
@@ -41,44 +42,30 @@ do
   fi
 done
 
-CONSUL_ADDR=http://127.0.0.1:8500
-
-logger "Temporarily registering ${service} service for Prepared Query"
-logger "$(
-  curl \
-    -H "Content-Type: application/json" \
-    -LX PUT \
-    -d '{ "Name": "${service}" }' \
-    $CONSUL_ADDR/v1/agent/service/register
-)"
-
-logger "Registering ${service} Prepared Query"
+logger "Create prepared query"
 logger "$(
   curl \
     -H "Content-Type: application/json" \
     -LX POST \
     -d \
 '{
-  "Name": "${service}",
+  "Name": "",
+  "Template": {
+    "Type": "name_prefix_match",
+    "Regexp": ""
+  },
   "Service": {
-    "Service": "${service}",
+    "Service": "$${name.full}",
     "Failover": {
       "NearestN": 3
     },
     "OnlyPassing": true,
-    "Tags": ["global"]
+    "Tags": [${tags}]
   },
   "DNS": {
     "TTL": "10s"
   }
 }' $CONSUL_ADDR/v1/query
 )"
-
-logger "Deregistering ${service} service"
-logger "$(
-  curl $CONSUL_ADDR/v1/agent/service/deregister/${service}
-)"
-
-sudo service consul start || sudo service consul restart
 
 logger "Done"

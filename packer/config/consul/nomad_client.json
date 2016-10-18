@@ -1,5 +1,4 @@
 {
-  "statsite_addr": "statsite.service.consul:8125",
   "statsite_prefix": "consul.nomad_client",
   "service": {
     "name": "nomad-client",

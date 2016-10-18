@@ -31,7 +31,7 @@ module "nomad_client_template" {
 }
 
 resource "template_file" "nomad_client_asg" {
-  template = "${module.nomad_client_template.user_data}"
+  template = "${module.nomad_client_template.script}"
   count    = "${var.groups}"
 
   vars {

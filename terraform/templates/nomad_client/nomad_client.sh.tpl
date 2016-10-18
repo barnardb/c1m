@@ -39,7 +39,8 @@ sudo sed -i -- "s/{{ log_level }}/${consul_log_level}/g" $CONSUL_DEFAULT_CONFIG
 logger "Configuring Consul Nomad client"
 CONSUL_NOMAD_CLIENT_CONFIG=/etc/consul.d/nomad_client.json
 
-sudo sed -i -- "s/\"{{ tags }}\"/\"${provider}\", \"${region}\", \"${zone}\", \"${machine_type}\", \"${node_class}\"/g" $CONSUL_NOMAD_CLIENT_CONFIG
+sudo sed -i -- 's/"{{ tags }}"/${consul_tags}/g' $CONSUL_NOMAD_CLIENT_CONFIG
+# sudo sed -i -- "s/\"{{ tags }}\"/\"${provider}\", \"${datacenter}\", \"${zone}\", \"${machine_type}\", \"${nomad_node_class}\"/g" $CONSUL_NOMAD_CLIENT_CONFIG
 
 echo $(date '+%s') | sudo tee -a /etc/consul.d/configured > /dev/null
 sudo service consul start || sudo service consul restart
@@ -66,27 +67,36 @@ sudo mkdir -p $NOMAD_DATA_DIR
 sudo chmod 0755 $NOMAD_DATA_DIR
 
 sudo sed -i -- "s/{{ data_dir }}/$${NOMAD_DATA_DIR//\//\\\/}/g" $NOMAD_DEFAULT_CONFIG
-sudo sed -i -- "s/{{ region }}/${region}/g" $NOMAD_DEFAULT_CONFIG
+sudo sed -i -- "s/{{ region }}/${nomad_region}/g" $NOMAD_DEFAULT_CONFIG
 sudo sed -i -- "s/{{ datacenter }}/${datacenter}/g" $NOMAD_DEFAULT_CONFIG
 sudo sed -i -- "s/{{ local_ip }}/$METADATA_LOCAL_IP/g" $NOMAD_DEFAULT_CONFIG
 sudo sed -i -- "s/{{ node_id }}/$NODE_NAME/g" $NOMAD_DEFAULT_CONFIG
 sudo sed -i -- "s/{{ name }}/$NODE_NAME/g" $NOMAD_DEFAULT_CONFIG
 sudo sed -i -- "s/{{ log_level }}/${nomad_log_level}/g" $NOMAD_DEFAULT_CONFIG
 
+sudo cat <<EOF >> $NOMAD_DEFAULT_CONFIG
+
+atlas {
+  infrastructure = "${atlas_username}/${atlas_environment}"
+  token          = "${atlas_token}"
+}
+EOF
+
 logger "Configure Nomad client"
 
 NOMAD_CLIENT_CONFIG=/etc/nomad.d/client.hcl
 
 sudo sed -i -- "s/{{ node_id }}/$NODE_NAME/g" $NOMAD_CLIENT_CONFIG
-sudo sed -i -- "s/{{ region }}/${region}/g" $NOMAD_CLIENT_CONFIG
+sudo sed -i -- "s/{{ region }}/${nomad_region}/g" $NOMAD_CLIENT_CONFIG
 sudo sed -i -- "s/{{ machine_type }}/${machine_type}/g" $NOMAD_CLIENT_CONFIG
-sudo sed -i -- 's/{{ node_class }}/${node_class}/g' $NOMAD_CLIENT_CONFIG
+sudo sed -i -- 's/{{ node_class }}/${nomad_node_class}/g' $NOMAD_CLIENT_CONFIG
 
 echo $(date '+%s') | sudo tee -a /etc/nomad.d/configured > /dev/null
 sudo service nomad start || sudo service nomad restart
 
 logger "Nomad server join: ${nomad_join_name}"
-sleep 15 # Wait for Nomad service to fully boot
+logger "Wait 15 seconds for Nomad service to fully boot"
+sleep 15
 sudo /opt/nomad/nomad_join.sh "${nomad_join_name}"
 
 logger "Done"

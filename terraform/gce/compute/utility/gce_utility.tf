@@ -13,6 +13,7 @@ variable "disk_size"         { default = "10" }
 variable "mount_dir"         { default = "/mnt/ssd0" }
 variable "local_ssd_name"    { default = "local-ssd-0" }
 variable "consul_log_level"  { }
+variable "datacenter"        { }
 variable "ssh_keys"          { }
 variable "private_key"       { }
 
@@ -28,21 +29,21 @@ module "utility_template" {
 }
 
 resource "template_file" "utility" {
-  template = "${module.utility_template.user_data}"
+  template = "${module.utility_template.script}"
 
   vars {
     private_key       = "${var.private_key}"
     data_dir          = "/opt"
+    local_ip_url      = "-H \"Metadata-Flavor: Google\" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/ip"
     atlas_username    = "${var.atlas_username}"
     atlas_environment = "${var.atlas_environment}"
     atlas_token       = "${var.atlas_token}"
+    consul_log_level  = "${var.consul_log_level}"
+    consul_tags       = "\"gce\", \"${var.datacenter}\", \"${element(split(",", var.zones), count.index % length(split(",", var.zones)))}\", \"${var.machine_type}\""
+    datacenter        = "${var.datacenter}"
     provider          = "gce"
-    region            = "gce-${var.region}"
-    datacenter        = "gce-${var.region}"
     zone              = "${element(split(",", var.zones), count.index % length(split(",", var.zones)))}"
     machine_type      = "${var.machine_type}"
-    consul_log_level  = "${var.consul_log_level}"
-    local_ip_url      = "-H \"Metadata-Flavor: Google\" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/ip"
   }
 }
 
@@ -95,7 +96,7 @@ resource "google_compute_instance" "utility" {
 }
 
 resource "google_compute_firewall" "allow-http" {
-  name    = "${var.name}-allow-http"
+  name    = "${var.name}-${var.region}-allow-http"
   network = "${var.network}"
 
   allow {

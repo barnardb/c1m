@@ -15,6 +15,7 @@ variable "local_ssd_name"    { default = "local-ssd-0" }
 variable "consul_join_name"  { default = "consul-server?passing" }
 variable "servers"           { }
 variable "consul_log_level"  { }
+variable "datacenter"        { }
 variable "ssh_keys"          { }
 variable "private_key"       { }
 
@@ -30,23 +31,23 @@ module "consul_server_template" {
 }
 
 resource "template_file" "consul_server" {
-  template = "${module.consul_server_template.user_data}"
+  template = "${module.consul_server_template.script}"
   count    = "${var.servers}"
 
   vars {
     private_key       = "${var.private_key}"
     data_dir          = "/opt"
+    local_ip_url      = "-H \"Metadata-Flavor: Google\" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/ip"
     atlas_username    = "${var.atlas_username}"
     atlas_environment = "${var.atlas_environment}"
     atlas_token       = "${var.atlas_token}"
+    consul_log_level  = "${var.consul_log_level}"
+    consul_servers    = "${var.servers}"
+    consul_tags       = "\"gce\", \"${var.datacenter}\", \"${element(split(",", var.zones), count.index % length(split(",", var.zones)))}\", \"${var.machine_type}\""
+    datacenter        = "${var.datacenter}"
     provider          = "gce"
-    region            = "gce-${var.region}"
-    datacenter        = "gce-${var.region}"
-    bootstrap_expect  = "${var.servers}"
     zone              = "${element(split(",", var.zones), count.index % length(split(",", var.zones)))}"
     machine_type      = "${var.machine_type}"
-    consul_log_level  = "${var.consul_log_level}"
-    local_ip_url      = "-H \"Metadata-Flavor: Google\" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/ip"
   }
 }
 
@@ -99,18 +100,11 @@ resource "google_compute_instance" "consul_server" {
   metadata_startup_script = "${element(template_file.consul_server.*.rendered, count.index % var.servers)}"
 }
 
-module "redis_pq_template" {
+module "pq_template" {
   source = "../../../templates/pq"
 
-  service          = "redis"
   consul_join_name = "${var.consul_join_name}"
-}
-
-module "nodejs_pq_template" {
-  source = "../../../templates/pq"
-
-  service          = "nodejs"
-  consul_join_name = "${var.consul_join_name}"
+  tags             = "\"nomad\""
 }
 
 resource "null_resource" "prepared_queries" {
@@ -128,8 +122,7 @@ resource "null_resource" "prepared_queries" {
 
   provisioner "remote-exec" {
     inline = [
-      "${module.redis_pq_template.script}",
-      "${module.nodejs_pq_template.script}",
+      "${module.pq_template.catch_all_script}",
     ]
   }
 }

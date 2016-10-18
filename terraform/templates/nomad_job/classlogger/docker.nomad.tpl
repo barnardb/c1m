@@ -1,8 +1,8 @@
 job "classlogger-docker" {
   region      = "${region}"
-  datacenters = ["${datacenter}"]
+  datacenters = [${datacenters}]
   type        = "service"
-  priority    = 50
+  priority    = ${priority}
 
   group "classlogger-1" {
     count = ${count}

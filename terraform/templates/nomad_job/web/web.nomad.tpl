@@ -1,8 +1,8 @@
 job "web" {
   region      = "${region}"
-  datacenters = ["${datacenter}"]
+  datacenters = [${datacenters}]
   type        = "service"
-  priority    = 50
+  priority    = ${priority}
 
   update {
     stagger      = "10s"
@@ -11,11 +11,6 @@ job "web" {
 
   group "nginx" {
     count = ${nginx_count}
-
-    constraint {
-      attribute = "\$${node.datacenter}"
-      value     = "${datacenter}"
-    }
 
     restart {
       mode     = "fail"
@@ -40,7 +35,7 @@ job "web" {
         network {
           mbits = 1
 
-          port "http" {
+          port "nginx" {
             static = 80
           }
         }
@@ -53,8 +48,8 @@ job "web" {
 
       service {
         name = "nginx"
-        tags = ["global", "${region}"]
-        port = "http"
+        port = "nginx"
+        tags = [${nginx_tags}]
 
         check {
           name     = "nginx alive"
@@ -69,11 +64,6 @@ job "web" {
   group "nodejs" {
     count = ${nodejs_count}
 
-    constraint {
-      attribute = "\$${node.datacenter}"
-      value     = "${datacenter}"
-    }
-
     restart {
       mode     = "fail"
       attempts = 3
@@ -85,7 +75,6 @@ job "web" {
       driver = "docker"
 
       config {
-        image        = "hashidemo/nodejs-dc-failover:latest"
         image        = "${nodejs_image}"
         network_mode = "host"
       }
@@ -99,7 +88,7 @@ job "web" {
           mbits = 1
 
           # Request for a dynamic port
-          port "http" {
+          port "nodejs" {
           }
         }
       }
@@ -117,8 +106,8 @@ job "web" {
 
       service {
         name = "nodejs"
-        tags = ["global", "${region}"]
-        port = "http"
+        port = "nodejs"
+        tags = [${nodejs_tags}]
 
         check {
           name     = "nodejs alive"
@@ -130,7 +119,6 @@ job "web" {
         check {
           name     = "nodejs running on port 8080"
           type     = "http"
-          protocol = "http"
           path     = "/"
           interval = "10s"
           timeout  = "1s"

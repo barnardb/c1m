@@ -38,8 +38,9 @@ sudo sed -i -- "s/{{ log_level }}/${consul_log_level}/g" $CONSUL_DEFAULT_CONFIG
 logger "Configuring Consul server"
 CONSUL_SERVER_CONFIG=/etc/consul.d/consul_server.json
 
-sudo sed -i -- "s/{{ bootstrap_expect }}/${bootstrap_expect}/g" $CONSUL_SERVER_CONFIG
-sudo sed -i -- "s/\"{{ tags }}\"/\"${provider}\", \"${region}\", \"${zone}\", \"${machine_type}\"/g" $CONSUL_SERVER_CONFIG
+sudo sed -i -- "s/{{ bootstrap_expect }}/${consul_servers}/g" $CONSUL_SERVER_CONFIG
+sudo sed -i -- 's/"{{ tags }}"/${consul_tags}/g' $CONSUL_SERVER_CONFIG
+# sudo sed -i -- "s/\"{{ tags }}\"/\"${provider}\", \"${datacenter}\", \"${zone}\", \"${machine_type}\"/g" $CONSUL_SERVER_CONFIG
 
 echo $(date '+%s') | sudo tee -a /etc/consul.d/configured > /dev/null
 sudo service consul start || sudo service consul restart

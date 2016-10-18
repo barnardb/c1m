@@ -38,7 +38,8 @@ sudo sed -i -- "s/{{ log_level }}/${consul_log_level}/g" $CONSUL_DEFAULT_CONFIG
 logger "Configuring Consul Utility"
 CONSUL_UTILITY_CONFIG=/etc/consul.d/utility.json
 
-sudo sed -i -- "s/\"{{ tags }}\"/\"${provider}\", \"${region}\", \"${zone}\", \"${machine_type}\"/g" $CONSUL_UTILITY_CONFIG
+sudo sed -i -- 's/"{{ tags }}"/${consul_tags}/g' $CONSUL_UTILITY_CONFIG
+# sudo sed -i -- "s/\"{{ tags }}\"/\"${provider}\", \"${datacenter}\", \"${zone}\", \"${machine_type}\"/g" $CONSUL_UTILITY_CONFIG
 
 logger "Configuring Consul Redis and Statsite"
 sudo sed -i -- "s/{{ local_ip }}/$METADATA_LOCAL_IP/g" /etc/consul.d/redis.json

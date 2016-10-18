@@ -28,7 +28,7 @@ module "consul_server_template" {
 }
 
 resource "template_file" "consul_server" {
-  template = "${module.consul_server_template.user_data}"
+  template = "${module.consul_server_template.script}"
   count    = "${var.servers}"
 
   vars {
@@ -126,17 +126,9 @@ resource "aws_instance" "consul_server" {
   */
 }
 
-module "redis_pq_template" {
+module "pq_template" {
   source = "../../../templates/pq"
 
-  service          = "redis"
-  consul_join_name = "${var.consul_join_name}"
-}
-
-module "nodejs_pq_template" {
-  source = "../../../templates/pq"
-
-  service          = "nodejs"
   consul_join_name = "${var.consul_join_name}"
 }
 
@@ -155,8 +147,7 @@ resource "null_resource" "prepared_queries" {
 
   provisioner "remote-exec" {
     inline = [
-      "${module.redis_pq_template.script}",
-      "${module.nodejs_pq_template.script}",
+      "${module.pq_template.catch_all_script}",
     ]
   }
 }

@@ -1,23 +1,27 @@
-variable "name"              { default = "nomad-server" }
-variable "project_id"        { }
-variable "credentials"       { }
-variable "atlas_username"    { }
-variable "atlas_environment" { }
-variable "atlas_token"       { }
-variable "region"            { }
-variable "network"           { default = "default" }
-variable "zones"             { }
-variable "image"             { }
-variable "machine_type"      { }
-variable "disk_size"         { default = "10" }
-variable "mount_dir"         { default = "/mnt/ssd0" }
-variable "local_ssd_name"    { default = "local-ssd-0" }
-variable "servers"           { }
-variable "nomad_join_name"   { default = "nomad-server?passing" }
-variable "nomad_log_level"   { }
-variable "consul_log_level"  { }
-variable "ssh_keys"          { }
-variable "private_key"       { }
+variable "name"               { default = "nomad-server" }
+variable "project_id"         { }
+variable "credentials"        { }
+variable "atlas_username"     { }
+variable "atlas_environment"  { }
+variable "atlas_token"        { }
+variable "region"             { }
+variable "network"            { default = "default" }
+variable "zones"              { }
+variable "image"              { }
+variable "machine_type"       { }
+variable "disk_size"          { default = "10" }
+variable "mount_dir"          { default = "/mnt/ssd0" }
+variable "local_ssd_name"     { default = "local-ssd-0" }
+variable "servers"            { }
+variable "consul_log_level"   { }
+variable "nomad_log_level"    { }
+variable "nomad_region"       { }
+variable "nomad_datacenters"  { }
+variable "nomad_node_classes" { }
+variable "nomad_join_name"    { default = "nomad-server?passing" }
+variable "datacenter"         { }
+variable "ssh_keys"           { }
+variable "private_key"        { }
 
 provider "google" {
   region      = "${var.region}"
@@ -31,25 +35,26 @@ module "nomad_server_template" {
 }
 
 resource "template_file" "nomad_server" {
-  template = "${module.nomad_server_template.user_data}"
+  template = "${module.nomad_server_template.script}"
   count    = "${var.servers}"
 
   vars {
     private_key       = "${var.private_key}"
     data_dir          = "/opt"
+    local_ip_url      = "-H \"Metadata-Flavor: Google\" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/ip"
     atlas_username    = "${var.atlas_username}"
     atlas_environment = "${var.atlas_environment}"
     atlas_token       = "${var.atlas_token}"
+    consul_log_level  = "${var.consul_log_level}"
+    consul_tags       = "\"gce\", \"${var.datacenter}\", \"${element(split(",", var.zones), count.index % length(split(",", var.zones)))}\", \"${var.machine_type}\""
+    nomad_log_level   = "${var.nomad_log_level}"
+    nomad_servers     = "${var.servers}"
+    nomad_region      = "${var.nomad_region}"
+    nomad_join_name   = "${var.nomad_join_name}"
+    datacenter        = "${var.datacenter}"
     provider          = "gce"
-    region            = "gce-${var.region}"
-    datacenter        = "gce-${var.region}"
-    bootstrap_expect  = "${var.servers}"
     zone              = "${element(split(",", var.zones), count.index % length(split(",", var.zones)))}"
     machine_type      = "${var.machine_type}"
-    nomad_join_name   = "${var.nomad_join_name}"
-    nomad_log_level   = "${var.nomad_log_level}"
-    consul_log_level  = "${var.consul_log_level}"
-    local_ip_url      = "-H \"Metadata-Flavor: Google\" http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/ip"
   }
 }
 
@@ -105,15 +110,32 @@ resource "google_compute_instance" "nomad_server" {
 module "nomad_jobs" {
   source = "../../../templates/nomad_job"
 
-  region            = "gce-${var.region}"
-  datacenter        = "gce-${var.region}"
+  region      = "${var.nomad_region}"
+  datacenters = "${var.nomad_datacenters}"
+
   classlogger_image = "hashicorp/nomad-c1m:0.1"
-  redis_count       = "1"
-  redis_image       = "hashidemo/redis:latest"
-  nginx_count       = "1"
-  nginx_image       = "hashidemo/nginx:latest"
-  nodejs_count      = "3"
-  nodejs_image      = "hashidemo/nodejs:latest"
+
+  redis_count = "1"
+  redis_image = "hashidemo/redis:latest"
+  redis_tags  = "\"nomad\", \"${var.nomad_region}\", \"${var.datacenter}\""
+
+  server_count           = "20"
+  server_artifact_source = "https://s3.amazonaws.com/hashicorp-nomad-demo/go-server/bin/go-server"
+  server_command         = "go-server"
+  server_tags            = "\"nomad\", \"${var.nomad_region}\", \"${var.datacenter}\""
+
+  client_count           = "40"
+  client_artifact_source = "https://s3.amazonaws.com/hashicorp-nomad-demo/go-client/bin/go-client"
+  client_command         = "go-client"
+  client_request_address = "http://server.query.consul:8000/"
+  client_tags            = "\"nomad\", \"${var.nomad_region}\", \"${var.datacenter}\""
+
+  nginx_count  = "1"
+  nginx_image  = "hashidemo/nginx:latest"
+  nginx_tags   = "\"nomad\", \"${var.nomad_region}\", \"${var.datacenter}\""
+  nodejs_count = "3"
+  nodejs_image = "hashidemo/nodejs:latest"
+  nodejs_tags  = "\"nomad\", \"${var.nomad_region}\", \"${var.datacenter}\""
 }
 
 resource "null_resource" "nomad_jobs" {
@@ -131,7 +153,7 @@ resource "null_resource" "nomad_jobs" {
   }
 
   provisioner "remote-exec" {
-    inline = "${module.nomad_jobs.cmd}"
+    inline = "${module.nomad_jobs.script}"
   }
 }
 

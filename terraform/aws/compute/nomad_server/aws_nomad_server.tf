@@ -29,7 +29,7 @@ module "nomad_server_template" {
 }
 
 resource "template_file" "nomad_server" {
-  template = "${module.nomad_server_template.user_data}"
+  template = "${module.nomad_server_template.script}"
   count    = "${var.servers}"
 
   vars {
@@ -158,7 +158,7 @@ resource "null_resource" "nomad_jobs" {
   }
 
   provisioner "remote-exec" {
-    inline = "${module.nomad_jobs.cmd}"
+    inline = "${module.nomad_jobs.script}"
   }
 }
 

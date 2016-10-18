@@ -39,7 +39,8 @@ sudo sed -i -- "s/{{ log_level }}/${consul_log_level}/g" $CONSUL_DEFAULT_CONFIG
 logger "Configuring Consul Nomad server"
 CONSUL_NOMAD_SERVER_CONFIG=/etc/consul.d/nomad_server.json
 
-sudo sed -i -- "s/\"{{ tags }}\"/\"${provider}\", \"${region}\", \"${zone}\", \"${machine_type}\"/g" $CONSUL_NOMAD_SERVER_CONFIG
+sudo sed -i -- 's/"{{ tags }}"/${consul_tags}/g' $CONSUL_NOMAD_SERVER_CONFIG
+# sudo sed -i -- "s/\"{{ tags }}\"/\"${provider}\", \"${datacenter}\", \"${zone}\", \"${machine_type}\"/g" $CONSUL_NOMAD_SERVER_CONFIG
 
 echo $(date '+%s') | sudo tee -a /etc/consul.d/configured > /dev/null
 sudo service consul start || sudo service consul restart
@@ -52,24 +53,33 @@ sudo mkdir -p $NOMAD_DATA_DIR
 sudo chmod 0755 $NOMAD_DATA_DIR
 
 sudo sed -i -- "s/{{ data_dir }}/$${NOMAD_DATA_DIR//\//\\\/}/g" $NOMAD_DEFAULT_CONFIG
-sudo sed -i -- "s/{{ region }}/${region}/g" $NOMAD_DEFAULT_CONFIG
+sudo sed -i -- "s/{{ region }}/${nomad_region}/g" $NOMAD_DEFAULT_CONFIG
 sudo sed -i -- "s/{{ datacenter }}/${datacenter}/g" $NOMAD_DEFAULT_CONFIG
 sudo sed -i -- "s/{{ local_ip }}/$METADATA_LOCAL_IP/g" $NOMAD_DEFAULT_CONFIG
 sudo sed -i -- "s/{{ node_id }}/$NODE_NAME/g" $NOMAD_DEFAULT_CONFIG
 sudo sed -i -- "s/{{ name }}/$NODE_NAME/g" $NOMAD_DEFAULT_CONFIG
 sudo sed -i -- "s/{{ log_level }}/${nomad_log_level}/g" $NOMAD_DEFAULT_CONFIG
 
+sudo cat <<EOF >> $NOMAD_DEFAULT_CONFIG
+
+atlas {
+  infrastructure = "${atlas_username}/${atlas_environment}"
+  token          = "${atlas_token}"
+}
+EOF
+
 logger "Configuring Nomad server"
 NOMAD_SERVER_CONFIG=/etc/nomad.d/server.hcl
 
 sudo sed -i -- "s/{{ local_ip }}/$METADATA_LOCAL_IP/g" $NOMAD_SERVER_CONFIG
-sudo sed -i -- "s/{{ bootstrap_expect }}/${bootstrap_expect}/g" $NOMAD_SERVER_CONFIG
+sudo sed -i -- "s/{{ bootstrap_expect }}/${nomad_servers}/g" $NOMAD_SERVER_CONFIG
 
 echo $(date '+%s') | sudo tee -a /etc/nomad.d/configured > /dev/null
 sudo service nomad start || sudo service nomad restart
 
 logger "Nomad server join: ${nomad_join_name}"
-sleep 15 # Wait for Nomad service to fully boot
+logger "Wait 15 seconds for Nomad service to fully boot"
+sleep 15
 sudo /opt/nomad/nomad_join.sh "${nomad_join_name}" "server"
 
 logger "Done"

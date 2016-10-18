@@ -26,7 +26,7 @@ module "utility_template" {
 }
 
 resource "template_file" "utility" {
-  template = "${module.utility_template.user_data}"
+  template = "${module.utility_template.script}"
 
   vars {
     private_key       = "${var.private_key}"
